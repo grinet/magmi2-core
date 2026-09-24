@@ -1,0 +1,59 @@
+{
+    "name": "grinet/magmi2-core",
+    "description": "Magmi New Era - Core import engine and plugin system",
+    "type": "library",
+    "license": "OSL-3.0",
+    "keywords": [
+        "magento",
+        "import",
+        "csv",
+        "product"
+    ],
+    "authors": [
+        {
+            "name": "Grinet",
+            "email": "info@grinet.com.tr"
+        },
+        {
+            "name": "Hidayet Ok",
+            "email": "hidonet@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=8.2",
+        "ext-pdo": "*",
+        "ext-pdo_mysql": "*",
+        "ext-mbstring": "*",
+        "ext-json": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0",
+        "phpoffice/phpspreadsheet": "^5.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Magmi\\Core\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Magmi\\Core\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "stable",
+    "suggest": {
+        "phpoffice/phpspreadsheet": "Install ^5.0 for XLS/XLSX support.",
+        "phpseclib/phpseclib": "Install ^2.0 for the optional legacy SFTP adapter.",
+        "ext-ftp": "Required for the optional FTP adapter."
+    },
+    "bin": [
+        "bin/magmi"
+    ],
+    "scripts": {
+        "test": "phpunit -c phpunit.xml"
+    },
+    "support": {
+        "issues": "https://github.com/grinet/magmi2-core/issues",
+        "source": "https://github.com/grinet/magmi2-core"
+    }
+}

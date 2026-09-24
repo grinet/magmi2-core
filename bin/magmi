@@ -1,0 +1,93 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+foreach ([$_composer_autoload_path ?? '', __DIR__ . '/../vendor/autoload.php', __DIR__ . '/../../../autoload.php'] as $autoload) {
+    if (is_file($autoload)) { require $autoload; break; }
+}
+
+use Magmi\Core\Config\ProfileManager;
+use Magmi\Core\Database\DbConfig;
+use Magmi\Core\Database\DbHelper;
+use Magmi\Core\Datasource\DatasourceFactory;
+use Magmi\Core\Import\ImportEngine;
+use Magmi\Core\Logger\FileLogger;
+use Magmi\Core\Plugin\ConfigurablePluginInterface;
+use Magmi\Core\Plugin\PluginDiscovery;
+use Magmi\Core\Plugin\PluginManager;
+
+$args = [];
+foreach (array_slice($argv, 2) as $arg) {
+    if (str_starts_with($arg, '--')) {
+        [$key, $value] = array_pad(explode('=', substr($arg, 2), 2), 2, true);
+        $args[$key] = $value;
+    }
+}
+$command = $argv[1] ?? 'help';
+try {
+    $configDir = $args['config'] ?? getcwd() . '/data/config';
+    if ($command === 'help') {
+        echo "Magmi New Era CLI\n  import --profile=NAME [--file=path.csv|tsv|xls|xlsx] [--mode=create|update|xcreate] [--config=dir] [--plugins=dir] [--log=path]\n  list-profiles [--config=dir]\n";
+        exit(0);
+    }
+    $profiles = new ProfileManager($configDir);
+    if ($command === 'list-profiles') {
+        foreach ($profiles->list() as $profile) { echo $profile->getName() . "\n"; }
+        exit(0);
+    }
+    if ($command !== 'import') { throw new InvalidArgumentException('Unknown command: ' . $command); }
+    $profileName = $args['profile'] ?? 'Default';
+    $profile = $profiles->load($profileName);
+    if (!$profile) { throw new RuntimeException('Profile not found: ' . $profileName); }
+    $global = $profiles->getGlobalConfig();
+    $config = $profile->getDatasourceConfig();
+    $file = $args['file'] ?? ($config['file'] ?? '');
+    if ($file === '') { throw new RuntimeException('No import file selected.'); }
+    if (!str_starts_with($file, '/') && !isset($args['file'])) {
+        $file = !empty($global['magento_path'])
+            ? rtrim($global['magento_path'], '/') . '/' . trim($config['basedir'] ?? 'var/import', '/') . '/' . $file
+            : dirname($configDir) . '/' . $file;
+    }
+    if (isset($args['datasource'])) { $config['type'] = $args['datasource']; }
+    $manager = new PluginManager();
+    $pluginDir = $args['plugins'] ?? dirname(rtrim($configDir, '/'), 2) . '/plugins';
+    foreach ((new PluginDiscovery())->scanAvailable($pluginDir) as $plugin) { $manager->register($plugin); }
+    foreach ($profile->getPluginConfig() as $id => $settings) {
+        if (empty($settings['enabled'])) { continue; }
+        $manager->enable($id);
+        $plugin = $manager->getAll()[$id];
+        PluginDiscovery::assertImplemented($plugin);
+        if ($plugin instanceof ConfigurablePluginInterface) { $plugin->setConfig($settings['config'] ?? []); }
+    }
+    if (!empty($global['magento_path'])) {
+        $dbConfig = DbConfig::fromEnvPhp($global['magento_path']);
+    } elseif (!empty($global['db_host']) && !empty($global['db_name']) && !empty($global['db_user'])) {
+        $dbConfig = DbConfig::fromArray([
+            'host' => $global['db_host'], 'port' => $global['db_port'] ?? 3306,
+            'dbname' => $global['db_name'], 'user' => $global['db_user'],
+            'password' => $global['db_pass'] ?? '', 'table_prefix' => $global['db_prefix'] ?? '',
+        ]);
+    } else { throw new RuntimeException('Database configuration is required.'); }
+    $db = new DbHelper($dbConfig);
+    $db->connect();
+    $engine = new ImportEngine($manager, $db);
+    $engine->setContext(array_merge($global, [
+        'profile' => $profileName,
+        'mode' => $args['mode'] ?? ($config['mode'] ?? 'xcreate'),
+        'import_file' => $file, 'import_dir' => dirname($file),
+        'magento_media_dir' => $global['magento_media_dir'] ?? (!empty($global['magento_path']) ? rtrim($global['magento_path'], '/') . '/pub/media' : null),
+        'csv_value_separator' => $config['value_separator'] ?? ',',
+    ]));
+    if (!empty($args['log'])) { $engine->setLogger(new FileLogger($args['log'])); }
+    $source = DatasourceFactory::open($file, $config);
+    try {
+        $engine->setDatasource($source);
+        $report = $engine->import();
+    } finally { $source->close(); }
+    echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n";
+    exit($report['status'] ? 0 : 1);
+} catch (Throwable $error) {
+    fwrite(STDERR, json_encode(['status' => false, 'message' => $error->getMessage()], JSON_UNESCAPED_UNICODE) . "\n");
+    exit(1);
+}
