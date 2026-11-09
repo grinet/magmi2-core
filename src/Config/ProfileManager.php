@@ -60,7 +60,6 @@ class ProfileManager
         // Reflection to set private name
         $ref = new \ReflectionClass($new);
         $prop = $ref->getProperty('name');
-        $prop->setAccessible(true);
         $prop->setValue($new, $toName);
         $this->save($new);
         return $new;

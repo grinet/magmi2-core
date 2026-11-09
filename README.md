@@ -65,3 +65,9 @@ php tests/integration/magento.php /path/to/test-magento
 This is an **alpha release**. Import behavior has been exercised against Magento Open Source 2.4.9 and PHP 8.4; other Magento versions allowed by Composer constraints are not yet certified. Sixteen legacy plugin entries are configuration-only and cannot be enabled for import. Indexers/cache are not refreshed automatically after direct database writes. Use a test store and validate your import before production use.
 
 License: [OSL-3.0](LICENSE).
+
+## PHP compatibility
+
+PHP 8.5 syntax and PHPCompatibility static checks were run on this release. Existing minimum PHP requirements are retained. Use a Magento release that supports your PHP runtime; syntax/static checks alone do not verify installation, DI compilation or storefront/admin behavior.
+
+The release remains alpha. Magento/Mage-OS database integration requires a test store; only standalone tests and source checks are included here.

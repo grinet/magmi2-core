@@ -46,10 +46,10 @@ class DbHelper
             $this->config->getUser(),
             $this->config->getPassword(),
             [
-                \PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
+                (PHP_VERSION_ID >= 80400 ? \Pdo\Mysql::ATTR_INIT_COMMAND : \PDO::MYSQL_ATTR_INIT_COMMAND) => "SET NAMES utf8mb4",
                 \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
                 \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
-                \PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
+                (PHP_VERSION_ID >= 80400 ? \Pdo\Mysql::ATTR_USE_BUFFERED_QUERY : \PDO::MYSQL_ATTR_USE_BUFFERED_QUERY) => true,
             ]
         );
     }
